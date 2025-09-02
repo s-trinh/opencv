@@ -1,14 +1,13 @@
 #ifndef P3P_H
 #define P3P_H
 
-
 #include "precomp.hpp"
 
-class p3p
+class p3p_old
 {
  public:
-  p3p(double fx, double fy, double cx, double cy);
-  p3p(cv::Mat cameraMatrix);
+  p3p_old(double fx, double fy, double cx, double cy);
+  p3p_old(cv::Mat cameraMatrix);
 
   bool solve(cv::Mat& R, cv::Mat& tvec, const cv::Mat& opoints, const cv::Mat& ipoints);
   int solve(std::vector<cv::Mat>& Rs, std::vector<cv::Mat>& tvecs, const cv::Mat& opoints, const cv::Mat& ipoints);
@@ -66,6 +65,27 @@ class p3p
 
   double fx, fy, cx, cy;
   double inv_fx, inv_fy, cx_fx, cy_fy;
+};
+
+
+
+
+
+class p3p {
+public:
+    p3p();
+    int estimate(std::vector<cv::Mat>& Rs, std::vector<cv::Mat>& ts, const cv::Mat& opoints, const cv::Mat& ipoints);
+
+private:
+    void calibrateAndNormalizePointsPnP(const cv::Mat& opoints, const cv::Mat& ipoints);
+
+    // 3D object points
+    cv::Matx33d points_mat;
+    /*
+     * calibrated normalized points
+     * K^-1 [u v 1]^T / ||K^-1 [u v 1]^T||
+     */
+    cv::Matx33d calib_norm_points_mat;
 };
 
 #endif // P3P_H
