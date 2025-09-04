@@ -244,7 +244,6 @@ std::array<Vec3d, 2> compute_pq(Matx33d C) {
     pq[1](0) = C.row(0)(0);
     pq[1](1) = C.row(0)(1);
     pq[1](2) = C.row(0)(2);
-    // std::cout << "pq[0]=" << pq[0].t() << std::endl;
 
     return pq;
 }
@@ -279,10 +278,10 @@ void refine_lambda(double &lambda1, double &lambda2, double &lambda3, const doub
 };
 
 void p3p::calibrateAndNormalizePointsPnP(const Mat &opoints_, const Mat &ipoints_) {
-    Mat ipoints = ipoints_.clone(), opoints = opoints_.clone();
+    Mat ipoints_input_depth = ipoints_.clone(), opoints_input_depth = opoints_.clone();
 
-    auto convertPoints = [] (Mat &points, int pt_dim) {
-        points.convertTo(points, CV_64F); // convert points to have float precision
+    auto convertPoints = [] (const Mat &points_input, Mat &points, int pt_dim) {
+        points_input.convertTo(points, CV_64F); // convert points to have float precision
         if (points.channels() > 1)
             points = points.reshape(1, (int)points.total()); // convert point to have 1 channel
         if (points.rows < points.cols)
@@ -292,9 +291,19 @@ void p3p::calibrateAndNormalizePointsPnP(const Mat &opoints_, const Mat &ipoints
             points = points.colRange(0, pt_dim);
     };
 
-    convertPoints(ipoints, 2);
-    convertPoints(opoints, 3);
+    Mat ipoints;
+    convertPoints(ipoints_input_depth, ipoints, 2);
+    for (int i = 0; i < ipoints.rows; i++) {
+        const double k_inv_u = ipoints.at<double>(i, 0);
+        const double k_inv_v = ipoints.at<double>(i, 1);
+        x_norm = 1.f / sqrt(k_inv_u*k_inv_u + k_inv_v*k_inv_v + 1);
+        im_copy[i](0) = k_inv_u * x_norm;
+        im_copy[i](1) = k_inv_v * x_norm;
+        im_copy[i](2) =           x_norm;
+    }
 
+    Mat opoints;
+    convertPoints(opoints_input_depth, opoints, 3);
     X_copy[0](0) = opoints.at<double>(0, 0);
     X_copy[0](1) = opoints.at<double>(0, 1);
     X_copy[0](2) = opoints.at<double>(0, 2);
@@ -306,48 +315,10 @@ void p3p::calibrateAndNormalizePointsPnP(const Mat &opoints_, const Mat &ipoints
     X_copy[2](0) = opoints.at<double>(2, 0);
     X_copy[2](1) = opoints.at<double>(2, 1);
     X_copy[2](2) = opoints.at<double>(2, 2);
-
-    for (int i = 0; i < ipoints.rows; i++) {
-        const double k_inv_u = ipoints.at<double>(i, 0);
-        const double k_inv_v = ipoints.at<double>(i, 1);
-        x_norm = 1.f / sqrt(k_inv_u*k_inv_u + k_inv_v*k_inv_v + 1);
-        x_copy[i](0) = k_inv_u * x_norm;
-        x_copy[i](1) = k_inv_v * x_norm;
-        x_copy[i](2) =           x_norm;
-    }
-
-
-
-    // X_copy[0](0) = -1.7429;
-    // X_copy[0](1) = 2.70302;
-    // X_copy[0](2) = -0.345314;
-
-    // X_copy[1](0) = -2.10149;
-    // X_copy[1](1) = 1.62142;
-    // X_copy[1](2) = -4.57339;
-
-    // X_copy[2](0) = -0.40168;
-    // X_copy[2](1) = 1.21755;
-    // X_copy[2](2) = 0.268399;
-
-
-
-
-    // x_copy[0](0) = -0.491469;
-    // x_copy[0](1) = -0.0551541;
-    // x_copy[0](2) = 0.869147;
-
-    // x_copy[1](0) = 0.222618;
-    // x_copy[1](1) = 0.541026;
-    // x_copy[1](2) = 0.811007;
-
-    // x_copy[2](0) = -0.580831;
-    // x_copy[2](1) = 0.0370644;
-    // x_copy[2](2) = 0.81318;
 }
 
 p3p::p3p() :
-    x_copy(), X_copy(), x_norm(1)
+    im_copy(), X_copy(), x_norm(1)
 {
 }
 
@@ -355,13 +326,20 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     CV_INSTRUMENT_REGION();
     calibrateAndNormalizePointsPnP(opoints, ipoints);
 
+    // std::cout << "X_copy[0]=" << X_copy[0].t() << std::endl;
+    // std::cout << "X_copy[1]=" << X_copy[1].t() << std::endl;
+    // std::cout << "X_copy[2]=" << X_copy[2].t() << std::endl;
+
     // std::cout << "x_copy[0]=" << x_copy[0].t() << std::endl;
     // std::cout << "x_copy[1]=" << x_copy[1].t() << std::endl;
     // std::cout << "x_copy[2]=" << x_copy[2].t() << std::endl;
 
-    // std::cout << "X_copy[0]=" << X_copy[0].t() << std::endl;
-    // std::cout << "X_copy[1]=" << X_copy[1].t() << std::endl;
-    // std::cout << "X_copy[2]=" << X_copy[2].t() << std::endl;
+    std::cout << "opoints:\n" << opoints << std::endl;
+    std::cout << "ipoints:\n" << ipoints << std::endl;
+
+    std::cout << "X_copy[0]=" << X_copy[0].t() << std::endl;
+    std::cout << "X_copy[1]=" << X_copy[1].t() << std::endl;
+    std::cout << "X_copy[2]=" << X_copy[2].t() << std::endl;
 
     Rs.reserve(4);
     ts.reserve(4);
@@ -375,7 +353,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     double a12 = norm(X12, NORM_L2SQR);
 
     std::array<Vec3d, 3> X = {X_copy[0], X_copy[1], X_copy[2]};
-    std::array<Vec3d, 3> x = {x_copy[0], x_copy[1], x_copy[2]};
+    std::array<Vec3d, 3> x = {im_copy[0], im_copy[1], im_copy[2]};
 
     // Switch X,x so that BC is the largest distance among {X01, X02, X12}
     if (a01 > a02) {
@@ -432,27 +410,19 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     C(2, 0) = C(0, 2);
     C(2, 1) = C(1, 2);
     C(2, 2) = -a - b * s + 1;
-    // std::cout << "C:\n" << C << std::endl;
 
     std::array<Vec3d, 2> pq = compute_pq(C);
 
-    // double d0, d1, d2;
-    // CameraPose pose;
-    // output->clear();
+    // XX << X01, X02, X01.cross(X02);
+    // XX = XX.inverse().eval();
     Matx33d XX;
-
-    // // XX << X01, X02, X01.cross(X02);
-    // // XX = XX.inverse().eval();
     XX(0,0) = X01(0);   XX(1,0) = X01(1);   XX(2,0) = X01(2);
     XX(0,1) = X02(0);   XX(1,1) = X02(1);   XX(2,1) = X02(2);
     Vec3d X01_X02 = X01.cross(X02);
     XX(0,2) = X01_X02(0);   XX(1,2) = X01_X02(1);   XX(2,2) = X01_X02(2);
     XX = XX.inv();
 
-    Matx33d YY;
-
     int n_sols = 0;
-
     for (int i = 0; i < 2; ++i) {
         // [p0 p1 p2] * [1; x; y] = 0, or [p0 p1 p2] * [d2; d0; d1] = 0
         double p0 = pq[i](0);
@@ -490,33 +460,18 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
                 Vec3d v1 = d0 * x[0] - d1 * x[1];
                 Vec3d v2 = d0 * x[0] - d2 * x[2];
                 // YY << v1, v2, v1.cross(v2);
+                Matx33d YY;
                 YY(0,0) = v1(0);   YY(1,0) = v1(1);   YY(2,0) = v1(2);
                 YY(0,1) = v2(0);   YY(1,1) = v2(1);   YY(2,1) = v2(2);
-                Vec3d v1_c2 = v1.cross(v2);
-                YY(0,2) = v1_c2(0);   YY(1,2) = v1_c2(1);   YY(2,2) = v1_c2(2);
+                Vec3d v1_v2 = v1.cross(v2);
+                YY(0,2) = v1_v2(0);   YY(1,2) = v1_v2(1);   YY(2,2) = v1_v2(2);
 
-                // std::cout << "YY:\n" << YY << std::endl;
-
-                Matx33d R = (YY * XX);
-                // Matx33d R = (YY * XX.t());
-                // Matx31d rvec;
-                // Rodrigues(R, rvec);
-                // Rodrigues(rvec, R);
                 // output->emplace_back(R, d0 * x[0] - R * X[0]);
+                Matx33d R = (YY * XX);
                 std::cout << "R:\n" << R << std::endl;
                 Rs.push_back(Mat(R));
-                // Vec3d trans = (d0 * x[0] - R * X[0]);
-                // ts.push_back(cv::Mat(-R * (X1 - R.t() * nX1)));
-                Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
-                // Vec3d trans = norm(v1_c2) * (d0 * x[0] - R * X[0]);
-                // trans(2) = x_norm;
-        // Vec3d Zw2 = (X2 - X1) / d12;
-        // Vec3d Zw3 = (X3 - X1) / d31;
-        // Vec3d Zw1 = Zw2.cross(Zw3); Zw1 /= norm(Zw1);
-        // const Vec3d Z3crZ1w = Zw3.cross(Zw1);
-        // ts.push_back(cv::Mat(-R * (X1 - R.t() * nX1)));
-                // std::cout << "det(YY)=" <<determinant(YY) << std::endl;
-                // std::cout << "det(XX)=" <<determinant(XX) << std::endl;
+                Vec3d trans = (d0 * x[0] - R * X[0]);
+                // Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
                 std::cout << "trans=" << trans.t() << std::endl;
                 ts.push_back(Mat(trans));
                 ++n_sols;
@@ -547,31 +502,18 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
                 Vec3d v1 = d0 * x[0] - d1 * x[1];
                 Vec3d v2 = d0 * x[0] - d2 * x[2];
                 // YY << v1, v2, v1.cross(v2);
+                Matx33d YY;
                 YY(0,0) = v1(0);   YY(1,0) = v1(1);   YY(2,0) = v1(2);
                 YY(0,1) = v2(0);   YY(1,1) = v2(1);   YY(2,1) = v2(2);
-                Vec3d v1_c2 = v1.cross(v2);
-                YY(0,2) = v1_c2(0);   YY(1,2) = v1_c2(1);   YY(2,2) = v1_c2(2);
+                Vec3d v1_v2 = v1.cross(v2);
+                YY(0,2) = v1_v2(0);   YY(1,2) = v1_v2(1);   YY(2,2) = v1_v2(2);
 
-                // std::cout << "YY:\n" << YY << std::endl;
-
-                Matx33d R = (YY * XX);
-                // Matx33d R = (YY * XX.t());
-                // Matx31d rvec;
-                // Rodrigues(R, rvec);
-                // Rodrigues(rvec, R);
-                std::cout << "R:\n" << R << std::endl;
                 // output->emplace_back(R, d0 * x[0] - R * X[0]);
+                Matx33d R = (YY * XX);
+                std::cout << "R:\n" << R << std::endl;
                 Rs.push_back(Mat(R));
-                // Vec3d trans = (d0 * x[0] - R * X[0]);
-                // ts.push_back(cv::Mat(-R * (X1 - R.t() * nX1)));
-                Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
-
-        // ts.push_back(cv::Mat(-R * (X1 - R.t() * nX1)));
-
-                // Vec3d trans = norm(v1_c2) * (d0 * x[0] - R * X[0]);
-                // trans(2) = x_norm;
-                // std::cout << "det(YY)=" <<determinant(YY) << std::endl;
-                // std::cout << "det(XX)=" <<determinant(XX) << std::endl;
+                Vec3d trans = (d0 * x[0] - R * X[0]);
+                // Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
                 std::cout << "trans=" << trans.t() << std::endl;
                 ts.push_back(Mat(trans));
                 ++n_sols;
@@ -583,6 +525,5 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     }
 
     std::cout << "n_sols=" << n_sols << " ; Rs.size()=" << Rs.size() << std::endl;
-    // return n_sols;
-    return Rs.size();
+    return n_sols;
 }

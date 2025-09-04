@@ -452,16 +452,19 @@ int solveP3P( InputArray _opoints, InputArray _ipoints,
     int solutions = 0;
     if (flags == SOLVEPNP_P3P)
     {
-        p3p_usac P3Psolver;
+        // p3p_usac P3Psolver;
+        // solutions = P3Psolver.estimate(Rs, ts, opoints, undistortedPoints);
+
+        p3p P3Psolver;
         solutions = P3Psolver.estimate(Rs, ts, opoints, undistortedPoints);
     }
     else if (flags == SOLVEPNP_AP3P)
     {
-        // ap3p P3Psolver(cameraMatrix);
-        // solutions = P3Psolver.solve(Rs, ts, opoints, undistortedPoints);
+        ap3p P3Psolver(cameraMatrix);
+        solutions = P3Psolver.solve(Rs, ts, opoints, undistortedPoints);
 
-        p3p P3Psolver;
-        solutions = P3Psolver.estimate(Rs, ts, opoints, undistortedPoints);
+        // p3p P3Psolver;
+        // solutions = P3Psolver.estimate(Rs, ts, opoints, undistortedPoints);
     }
 
     if (solutions == 0) {
@@ -505,6 +508,16 @@ int solveP3P( InputArray _opoints, InputArray _ipoints,
             std::swap(rvecs[j], rvecs[j-1]);
             std::swap(ts[j], ts[j-1]);
         }
+    }
+
+    // TODO:
+    if (flags == SOLVEPNP_P3P && !rvecs.empty())
+    {
+        Mat R_usac;
+        Rodrigues(rvecs.front(), R_usac);
+        std::cout << "USAC, _cameraMatrix:\n" << _cameraMatrix.getMat() << std::endl;
+        std::cout << "USAC P3P, R:\n" << R_usac << std::endl;
+        std::cout << "USAC P3P, tvec: " << ts.front().t() << std::endl;
     }
 
     int depthRot = _rvecs.fixedType() ? _rvecs.depth() : CV_64F;
