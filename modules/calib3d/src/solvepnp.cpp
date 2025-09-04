@@ -510,16 +510,6 @@ int solveP3P( InputArray _opoints, InputArray _ipoints,
         }
     }
 
-    // TODO:
-    if (flags == SOLVEPNP_P3P && !rvecs.empty())
-    {
-        Mat R_usac;
-        Rodrigues(rvecs.front(), R_usac);
-        std::cout << "USAC, _cameraMatrix:\n" << _cameraMatrix.getMat() << std::endl;
-        std::cout << "USAC P3P, R:\n" << R_usac << std::endl;
-        std::cout << "USAC P3P, tvec: " << ts.front().t() << std::endl;
-    }
-
     int depthRot = _rvecs.fixedType() ? _rvecs.depth() : CV_64F;
     int depthTrans = _tvecs.fixedType() ? _tvecs.depth() : CV_64F;
     _rvecs.create(solutions, 1, CV_MAKETYPE(depthRot, _rvecs.fixedType() && _rvecs.kind() == _InputArray::STD_VECTOR ? 3 : 1));

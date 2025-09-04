@@ -29,9 +29,8 @@ public:
 private:
     void calibrateAndNormalizePointsPnP(const cv::Mat& opoints, const cv::Mat& ipoints);
 
-    std::array<cv::Vec3d, 3> im_copy;
+    std::array<cv::Vec3d, 3> x_copy;
     std::array<cv::Vec3d, 3> X_copy;
-    double x_norm;
 };
 
 #endif // P3P_H

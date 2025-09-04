@@ -151,7 +151,8 @@ int p3p_usac::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat
 }
 
 
-namespace univariate {
+namespace yaqding
+{
 
 /* Sign of component with largest magnitude */
 inline double sign(const double z) { return z < 0 ? -1.0 : 1.0; }
@@ -176,10 +177,6 @@ static bool solve_cubic_single_real(double c2, double c1, double c0, double &roo
     return false;
 }
 
-}; // namespace univariate
-
-namespace
-{
 bool root2real(double b, double c, double &r1, double &r2) {
     const double THRESHOLD = -1.0e-12;
     double v = b * b - 4.0 * c;
@@ -296,10 +293,10 @@ void p3p::calibrateAndNormalizePointsPnP(const Mat &opoints_, const Mat &ipoints
     for (int i = 0; i < ipoints.rows; i++) {
         const double k_inv_u = ipoints.at<double>(i, 0);
         const double k_inv_v = ipoints.at<double>(i, 1);
-        x_norm = 1.f / sqrt(k_inv_u*k_inv_u + k_inv_v*k_inv_v + 1);
-        im_copy[i](0) = k_inv_u * x_norm;
-        im_copy[i](1) = k_inv_v * x_norm;
-        im_copy[i](2) =           x_norm;
+        double x_norm = 1.f / sqrt(k_inv_u*k_inv_u + k_inv_v*k_inv_v + 1);
+        x_copy[i](0) = k_inv_u * x_norm;
+        x_copy[i](1) = k_inv_v * x_norm;
+        x_copy[i](2) =           x_norm;
     }
 
     Mat opoints;
@@ -318,28 +315,13 @@ void p3p::calibrateAndNormalizePointsPnP(const Mat &opoints_, const Mat &ipoints
 }
 
 p3p::p3p() :
-    im_copy(), X_copy(), x_norm(1)
+    x_copy(), X_copy()
 {
 }
 
-int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opoints, const cv::Mat &ipoints) {
+int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat& opoints, const cv::Mat& ipoints) {
     CV_INSTRUMENT_REGION();
     calibrateAndNormalizePointsPnP(opoints, ipoints);
-
-    // std::cout << "X_copy[0]=" << X_copy[0].t() << std::endl;
-    // std::cout << "X_copy[1]=" << X_copy[1].t() << std::endl;
-    // std::cout << "X_copy[2]=" << X_copy[2].t() << std::endl;
-
-    // std::cout << "x_copy[0]=" << x_copy[0].t() << std::endl;
-    // std::cout << "x_copy[1]=" << x_copy[1].t() << std::endl;
-    // std::cout << "x_copy[2]=" << x_copy[2].t() << std::endl;
-
-    std::cout << "opoints:\n" << opoints << std::endl;
-    std::cout << "ipoints:\n" << ipoints << std::endl;
-
-    std::cout << "X_copy[0]=" << X_copy[0].t() << std::endl;
-    std::cout << "X_copy[1]=" << X_copy[1].t() << std::endl;
-    std::cout << "X_copy[2]=" << X_copy[2].t() << std::endl;
 
     Rs.reserve(4);
     ts.reserve(4);
@@ -353,7 +335,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     double a12 = norm(X12, NORM_L2SQR);
 
     std::array<Vec3d, 3> X = {X_copy[0], X_copy[1], X_copy[2]};
-    std::array<Vec3d, 3> x = {im_copy[0], im_copy[1], im_copy[2]};
+    std::array<Vec3d, 3> x = {x_copy[0], x_copy[1], x_copy[2]};
 
     // Switch X,x so that BC is the largest distance among {X01, X02, X12}
     if (a01 > a02) {
@@ -398,7 +380,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     const double k0 = k3_inv * (asqm12sq + a * m01sq);
 
     double s;
-    bool G = univariate::solve_cubic_single_real(k2, k1, k0, s);
+    bool G = yaqding::solve_cubic_single_real(k2, k1, k0, s);
 
     Matx33d C;
     C(0, 0) = -a + s * (1 - b);
@@ -411,7 +393,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
     C(2, 1) = C(1, 2);
     C(2, 2) = -a - b * s + 1;
 
-    std::array<Vec3d, 2> pq = compute_pq(C);
+    std::array<Vec3d, 2> pq = yaqding::compute_pq(C);
 
     // XX << X01, X02, X01.cross(X02);
     // XX = XX.inverse().eval();
@@ -442,7 +424,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
             double cc = (w0 * w0 - 2 * m02 * w0 - b + 1.0) * ca;
             double taus[2];
 
-            if (!root2real(cb, cc, taus[0], taus[1]))
+            if (!yaqding::root2real(cb, cc, taus[0], taus[1]))
                 continue;
 
             for (double tau : taus) {
@@ -456,7 +438,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
                 if (d0 < 0)
                     continue;
 
-                refine_lambda(d0, d1, d2, a01, a02, a12, m01, m02, m12);
+                yaqding::refine_lambda(d0, d1, d2, a01, a02, a12, m01, m02, m12);
                 Vec3d v1 = d0 * x[0] - d1 * x[1];
                 Vec3d v2 = d0 * x[0] - d2 * x[2];
                 // YY << v1, v2, v1.cross(v2);
@@ -468,11 +450,8 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
 
                 // output->emplace_back(R, d0 * x[0] - R * X[0]);
                 Matx33d R = (YY * XX);
-                std::cout << "R:\n" << R << std::endl;
                 Rs.push_back(Mat(R));
                 Vec3d trans = (d0 * x[0] - R * X[0]);
-                // Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
-                std::cout << "trans=" << trans.t() << std::endl;
                 ts.push_back(Mat(trans));
                 ++n_sols;
             }
@@ -484,7 +463,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
             double cc = (1 - a * w0 * w0) * ca;
 
             double taus[2];
-            if (!root2real(cb, cc, taus[0], taus[1]))
+            if (!yaqding::root2real(cb, cc, taus[0], taus[1]))
                 continue;
 
             for (double tau : taus) {
@@ -498,7 +477,7 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
                 if (d2 < 0)
                     continue;
 
-                refine_lambda(d0, d1, d2, a01, a02, a12, m01, m02, m12);
+                yaqding::refine_lambda(d0, d1, d2, a01, a02, a12, m01, m02, m12);
                 Vec3d v1 = d0 * x[0] - d1 * x[1];
                 Vec3d v2 = d0 * x[0] - d2 * x[2];
                 // YY << v1, v2, v1.cross(v2);
@@ -510,11 +489,8 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
 
                 // output->emplace_back(R, d0 * x[0] - R * X[0]);
                 Matx33d R = (YY * XX);
-                std::cout << "R:\n" << R << std::endl;
                 Rs.push_back(Mat(R));
                 Vec3d trans = (d0 * x[0] - R * X[0]);
-                // Vec3d trans = -R * (d0 * (x[0] - R.t() * X[0]));
-                std::cout << "trans=" << trans.t() << std::endl;
                 ts.push_back(Mat(trans));
                 ++n_sols;
             }
@@ -524,6 +500,5 @@ int p3p::estimate(std::vector<Mat>& Rs, std::vector<Mat>& ts, const cv::Mat &opo
             break;
     }
 
-    std::cout << "n_sols=" << n_sols << " ; Rs.size()=" << Rs.size() << std::endl;
     return n_sols;
 }
