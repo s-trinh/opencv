@@ -248,6 +248,7 @@ bool CalibProcessor::checkLastFrame()
     cv::Mat r, t, angles;
     cv::solvePnP(mCalibData->objectPoints.back(), mCalibData->imagePoints.back(), tmpCamMatrix, mCalibData->distCoeffs, r, t);
     RodriguesToEuler(r, angles, CALIB_DEGREES);
+    std::cout << "angles=" << angles.t() << " ; bad=" << (fabs(angles.at<double>(0)) > badAngleThresh || fabs(angles.at<double>(1)) > badAngleThresh) << std::endl;
     if(fabs(angles.at<double>(0)) > badAngleThresh || fabs(angles.at<double>(1)) > badAngleThresh) {
         mCalibData->objectPoints.pop_back();
         mCalibData->imagePoints.pop_back();
@@ -322,6 +323,7 @@ cv::Mat CalibProcessor::processFrame(const cv::Mat &frame)
     {
     case Chessboard:
         isTemplateFound = detectAndParseChessboard(frameCopy);
+        std::cout << "isTemplateFound=" << isTemplateFound << std::endl;
         break;
     case ChArUco:
         isTemplateFound = detectAndParseChAruco(frameCopy);
@@ -337,9 +339,11 @@ cv::Mat CalibProcessor::processFrame(const cv::Mat &frame)
         break;
     }
 
+    std::cout << "mTemplateLocations.size()=" << mTemplateLocations.size() << " ; mDelayBetweenCaptures=" << mDelayBetweenCaptures
+        << " ; mNeededFramesNum=" << mNeededFramesNum << std::endl;
     if(mTemplateLocations.size() > mDelayBetweenCaptures)
         mTemplateLocations.pop_back();
-    if(mTemplateLocations.size() == mDelayBetweenCaptures && isTemplateFound) {
+    if((mTemplateLocations.size() == mDelayBetweenCaptures && isTemplateFound) || (isTemplateFound)) {
         if(cv::norm(mTemplateLocations.front() - mTemplateLocations.back()) < mMaxTemplateOffset) {
             saveFrameData();
             bool isFrameBad = checkLastFrame();

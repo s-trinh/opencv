@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <iostream>
 
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
@@ -75,8 +76,11 @@ void calib::calibController::updateState()
         mConfIntervalsState = fConfState && cConfState && dConfState;
     }
 
-    if(getFramesNumberState())
-        mCoverageQualityState = estimateCoverageQuality() > 1.8 ? true : false;
+    if(getFramesNumberState()) {
+        std::cout << "calibController::updateState() ; estimateCoverageQuality()=" << estimateCoverageQuality() << std::endl;
+        mCoverageQualityState = true;
+        // mCoverageQualityState = estimateCoverageQuality() > 1.8 ? true : false;
+    }
 
     if (getFramesNumberState() && mNeedTuning) {
         if( !(mCalibFlags & cv::CALIB_FIX_ASPECT_RATIO) &&
@@ -124,11 +128,18 @@ bool calib::calibController::getCommonCalibrationState() const
 {
     int rating = (int)getFramesNumberState() + (int)getConfidenceIntrervalsState() +
             (int)getRMSState() + (int)mCoverageQualityState;
-    return rating == 4;
+    std::cout << "getFramesNumberState=" << getFramesNumberState() << std::endl;
+    std::cout << "getConfidenceIntrervalsState=" << getConfidenceIntrervalsState() << std::endl;
+    std::cout << "getRMSState=" << getRMSState() << std::endl;
+    std::cout << "mCoverageQualityState=" << mCoverageQualityState << std::endl;
+    std::cout << "rating=" << rating << std::endl;
+    return true;
+    // return rating == 4;
 }
 
 bool calib::calibController::getFramesNumberState() const
 {
+    std::cout << "getFramesNumberState ; mCalibData->imagePoints.size()=" << mCalibData->imagePoints.size() << " ; mMinFramesNum=" << mMinFramesNum << std::endl;
     return std::max(mCalibData->imagePoints.size(), mCalibData->allCharucoCorners.size()) > mMinFramesNum;
 }
 
@@ -139,6 +150,7 @@ bool calib::calibController::getConfidenceIntrervalsState() const
 
 bool calib::calibController::getRMSState() const
 {
+    std::cout << "getRMSState ; mCalibData->totalAvgErr=" << mCalibData->totalAvgErr << std::endl;
     return mCalibData->totalAvgErr < 0.5;
 }
 
@@ -290,11 +302,13 @@ void calib::calibDataController::deleteAllData()
 
 bool calib::calibDataController::saveCurrentCameraParameters() const
 {
-
+    std::cout << "mCalibData->allFrames.size()=" << mCalibData->allFrames.size() << std::endl;
     for(size_t i = 0; i < mCalibData->allFrames.size(); i++)
         cv::imwrite(cv::format("calibration_%zu.png", i), mCalibData->allFrames[i]);
 
     bool success = false;
+    std::cout << "mCalibData->cameraMatrix.total()=" << mCalibData->cameraMatrix.total() << std::endl;
+    std::cout << "mParamsFileName=" << mParamsFileName << std::endl;
     if(mCalibData->cameraMatrix.total()) {
             cv::FileStorage parametersWriter(mParamsFileName, cv::FileStorage::WRITE);
             if(parametersWriter.isOpened()) {

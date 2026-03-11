@@ -57,8 +57,11 @@ PipelineExitStatus CalibPipeline::start(std::vector<cv::Ptr<FrameProcessor> > pr
             }
             mCapture.set(cv::CAP_PROP_AUTOFOCUS, 0);
         }
-        else if (mCaptureParams.source == File)
+        else if (mCaptureParams.source == File) {
+            std::cout << "mCaptureParams.source == File ; videoFileName=" << mCaptureParams.videoFileName
+                << " ; camBackend=" << mCaptureParams.camBackend << " ; cv::CAP_IMAGES=" << (int)cv::CAP_IMAGES << std::endl;
             mCapture.open(mCaptureParams.videoFileName, mCaptureParams.camBackend);
+        }
     };
 
     if(!mCapture.isOpened()) {
@@ -75,7 +78,15 @@ PipelineExitStatus CalibPipeline::start(std::vector<cv::Ptr<FrameProcessor> > pr
         {
             if (!mCaptureParams.forceReopen)
             {
-                CV_LOG_ERROR(NULL, "VideoCapture error: could not grab the frame.");
+                std::cout << "if (!mCaptureParams.forceReopen)" << std::endl;
+                if (mCaptureParams.camBackend != cv::CAP_IMAGES) {
+                    CV_LOG_ERROR(NULL, "VideoCapture error: could not grab the frame.");
+                } else {
+                    // Finish reading all the images
+                // for (std::vector<cv::Ptr<FrameProcessor> >::iterator it = processors.begin(); it != processors.end(); ++it)
+                //     processedFrame = (*it)->processFrame(processedFrame);
+                //     return Finished;
+                }
                 break;
             }
 
@@ -89,6 +100,7 @@ PipelineExitStatus CalibPipeline::start(std::vector<cv::Ptr<FrameProcessor> > pr
             auto newSize = cv::Size((int)mCapture.get(cv::CAP_PROP_FRAME_WIDTH), (int)mCapture.get(cv::CAP_PROP_FRAME_HEIGHT));
             CV_CheckEQ(mImageSize, newSize, "Camera image size changed after reopening.");
         }
+        std::cout << "mCapture.retrieve(frame);" << std::endl;
         mCapture.retrieve(frame);
 
         if (frame.empty()) {
@@ -101,6 +113,7 @@ PipelineExitStatus CalibPipeline::start(std::vector<cv::Ptr<FrameProcessor> > pr
             continue;
         } else {
             emptyFrames = 0;
+            std::cout << "mImageSize.width=" << mImageSize.width << " ; mImageSize.height=" << mImageSize.height << std::endl;
             if (mImageSize.width == 0 || mImageSize.height == 0) { // looks like VideoCapture does not support required properties
                 mImageSize = frame.size();
             }
@@ -136,9 +149,12 @@ PipelineExitStatus CalibPipeline::start(std::vector<cv::Ptr<FrameProcessor> > pr
         else if (key == 118) // v
             return SwitchVisualisation;
 
-        for (std::vector<cv::Ptr<FrameProcessor> >::iterator it = processors.begin(); it != processors.end(); ++it)
+        std::cout << "processors=" << processors.size() << std::endl;
+        for (std::vector<cv::Ptr<FrameProcessor> >::iterator it = processors.begin(); it != processors.end(); ++it) {
+            std::cout << "isProcessed=" << (*it)->isProcessed() << std::endl;
             if((*it)->isProcessed())
                 return Calibrate;
+        }
     }
 
     return Finished;

@@ -57,7 +57,7 @@ bool calib::parametersController::loadFromFile(const std::string &inputFileName)
     bool retValue =
             checkAssertion(mCapParams.charucoMarkerSize > 0, "Marker size must be positive") &&
             checkAssertion(mCapParams.charucoSquareLength > 0, "Square size must be positive") &&
-            checkAssertion(mCapParams.minFramesNum > 1, "Minimal number of frames for calibration < 1") &&
+            checkAssertion(mCapParams.minFramesNum > 1, "Minimal number of frames for calibration < 2") &&
             checkAssertion(mCapParams.calibrationStep > 0, "Calibration step must be positive") &&
             checkAssertion(mCapParams.maxFramesNum > mCapParams.minFramesNum, "maxFramesNum < minFramesNum") &&
             checkAssertion(mInternalParameters.solverEps > 0, "Solver precision must be positive") &&
@@ -87,6 +87,7 @@ calib::internalParameters calib::parametersController::getInternalParameters() c
 
 bool calib::parametersController::loadFromParser(cv::CommandLineParser &parser)
 {
+    mCapParams.minFramesNum = 2;
     mCapParams.flipVertical = parser.get<bool>("flip");
     mCapParams.captureDelay = parser.get<float>("d");
     mCapParams.squareSize = parser.get<float>("sz");

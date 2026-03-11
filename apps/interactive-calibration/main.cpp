@@ -179,6 +179,7 @@ int main(int argc, char** argv)
         while(!pipelineFinished)
         {
             PipelineExitStatus exitStatus = pipeline->start(processors);
+            std::cout << "exitStatus=" << exitStatus << " ; Finished=" << Finished << " ; Calibrate=" << Calibrate << std::endl;
             if (exitStatus == Finished) {
                 if(controller->getCommonCalibrationState())
                     saveCurrentParamsButton(0, &dataController);
@@ -186,7 +187,6 @@ int main(int argc, char** argv)
                 continue;
             }
             else if (exitStatus == Calibrate) {
-
                 dataController->rememberCurrentParameters();
                 globalData->imageSize = pipeline->getImageSize();
                 calibrationFlags = controller->getNewFlags();
@@ -197,6 +197,7 @@ int main(int argc, char** argv)
                                             globalData->distCoeffs, cv::noArray(), cv::noArray(),
                                             globalData->stdDeviations, cv::noArray(), globalData->perViewErrors,
                                             calibrationFlags, solverTermCrit);
+                std::cout << "totalAvgErr=" << globalData->totalAvgErr << std::endl;
                 dataController->updateUndistortMap();
                 dataController->printParametersToConsole(std::cout);
                 controller->updateState();
